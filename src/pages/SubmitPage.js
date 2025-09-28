@@ -2,7 +2,6 @@ import "./SubmitPage.css";
 import { useState, useEffect, useMemo, useRef } from "react";
 import dayjs from "dayjs";
 import { calculateResortsDriving } from "../scripts/drivingTimeLogic";
-import { sort_resorts } from "../scripts/sort";
 import PossibleTrip from "../components/PossibleTrip";
 import SortByDropdown from "../components/SortByDropdown";
 import usePredictPrice from "../scripts/predict-price";
@@ -10,147 +9,13 @@ import AOS from "aos";
 import SkeletonCard from "../components/SkeletonCard";
 import "aos/dist/aos.css";
 import submitVideo from "../media/submit-page-backdrop.mp4";
+import estimateRoundTripGasCostLocal from "../scripts/estimateRoundTripGasCost";
+import getMultiDayTicketCostLocal from "../scripts/getMultiDayTicketCost";
+import { AnimatedOnMount, applySortInline, sameOrder, mapWithConcurrency, getResortKey, FilterToggles } from "../scripts/submitPageHelpers";
 
-const getResortKey = (r) => r.id ?? `${r.name}|${r.latitude}|${r.longitude}`;
-
-// Concurrency tunable (env override allowed)
 const PREDICT_CONCURRENCY = Number(
   process.env.REACT_APP_PRICE_CONCURRENCY || 3
 );
-
-async function mapWithConcurrency(items, limit, mapper) {
-  const results = new Array(items.length);
-  let i = 0;
-  const workers = Array(Math.min(limit, items.length))
-    .fill(0)
-    .map(async () => {
-      while (true) {
-        const idx = i++;
-        if (idx >= items.length) break;
-        results[idx] = await mapper(items[idx], idx);
-      }
-    });
-  await Promise.all(workers);
-  return results;
-}
-
-function AnimatedOnMount({ children }) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    el.setAttribute("data-aos", "zoom-in");
-    el.setAttribute("data-aos-once", "true");
-    el.setAttribute("data-aos-duration", "800");
-
-    el.classList.add("aos-init");
-    requestAnimationFrame(() => {
-      el.classList.add("aos-animate");
-    });
-
-    AOS.refreshHard();
-  }, []);
-
-  return <div ref={ref}>{children}</div>;
-}
-
-const DEFAULT_AVG_GAS_PRICE = 3.75; // $/gal
-const DEFAULT_CAR_MPG = 28; // mpg
-const DEFAULT_AVG_SPEED = 55; // mph
-
-const EPIC_MULTIPLIERS_LOCAL = {
-  1: 1.0,
-  2: 240 / 125,
-  3: 350 / 125,
-  4: 453 / 125,
-  5: 550 / 125,
-  6: 640 / 125,
-  7: 723 / 125,
-};
-
-function getMultiDayTicketCostLocal(basePrice, days, guests) {
-  if (!basePrice || !isFinite(basePrice) || !days || days < 1) return null;
-  if (days <= 7)
-    return basePrice * (EPIC_MULTIPLIERS_LOCAL[days] ?? EPIC_MULTIPLIERS_LOCAL[7]);
-  const d7 = EPIC_MULTIPLIERS_LOCAL[7];
-  const perDayAt7 = d7 / 7;
-  const extra = days - 7;
-  return basePrice * (d7 + extra * perDayAt7);
-}
-
-function parseDrivingHoursLocal(str) {
-  if (typeof str === "number") return str;
-  if (!str || typeof str !== "string") return 0;
-  const s = str.toLowerCase();
-  const hrMatch = s.match(/(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours)/);
-  const minMatch = s.match(/(\d+(?:\.\d+)?)\s*(m|min|mins|minute|minutes)/);
-
-  let hours = 0;
-  if (hrMatch) hours += parseFloat(hrMatch[1]);
-  if (minMatch) hours += parseFloat(minMatch[1]) / 60;
-
-  if (!hrMatch && !minMatch) {
-    const colon = s.match(/(\d+):(\d{1,2})/);
-    if (colon) hours = parseInt(colon[1], 10) + parseInt(colon[2], 10) / 60;
-  }
-  return Number.isNaN(hours) ? 0 : hours;
-}
-
-function estimateRoundTripGasCostLocal({
-  drivingTime,
-  avgSpeed = DEFAULT_AVG_SPEED,
-  mpg = DEFAULT_CAR_MPG,
-  gasPrice = DEFAULT_AVG_GAS_PRICE,
-  distanceMiles,
-}) {
-  let oneWayMiles = 0;
-  if (typeof distanceMiles === "number" && distanceMiles > 0) {
-    oneWayMiles = distanceMiles;
-  } else {
-    const hours = parseDrivingHoursLocal(drivingTime);
-    oneWayMiles = hours * avgSpeed;
-  }
-  const rtMiles = oneWayMiles * 2;
-  const gallons = rtMiles / mpg;
-  const cost = gallons * gasPrice;
-  return Number.isNaN(cost) ? 0 : cost;
-}
-
-/* =========================
-   Sorting utilities
-   ========================= */
-function applySortInline(list, key, dir, getTotalCostForResort) {
-  const sorted = sort_resorts(list, key, getTotalCostForResort);
-  return dir === "desc" ? [...sorted].reverse() : sorted;
-}
-function sameOrder(a, b) {
-  if (a === b) return true;
-  if (!a || !b || a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (getResortKey(a[i]) !== getResortKey(b[i])) return false;
-  }
-  return true;
-}
-
-// Simple pill toggles under "Sort By"
-function FilterToggles({ toggles, onToggle }) {
-  return (
-    <div className="filter-toggles">
-      {toggles.map((t) => (
-        <label key={t.key} className="filter-toggle-pill">
-          <input
-            type="checkbox"
-            checked={!!t.checked}
-            onChange={(e) => onToggle(t.key, e.target.checked)}
-          />
-          {t.label}
-        </label>
-      ))}
-    </div>
-  );
-}
 
 function SubmitPage({ data, onBack }) {
   const [resorts, setResorts] = useState(() =>
@@ -215,12 +80,11 @@ function SubmitPage({ data, onBack }) {
   const checkIn = data.checkIn;
   const checkOut = data.checkOut;
 
-  // Fetch housing prices for missing resorts with concurrency
   useEffect(() => {
     if (!resorts || resorts.length === 0) return;
 
     let mounted = true;
-    const ac = new AbortController(); // for axios aborts
+    const ac = new AbortController(); 
 
     const missing = resorts.filter((r) => {
       const k = getResortKey(r);
@@ -358,7 +222,6 @@ function SubmitPage({ data, onBack }) {
 
   return (
     <div className="submit-outer">
-      {/* Fixed blurred video background */}
       <div className="submit-video-container" aria-hidden="true">
         <video autoPlay muted loop playsInline>
           <source src={submitVideo} type="video/mp4" />
@@ -366,9 +229,7 @@ function SubmitPage({ data, onBack }) {
         <div className="submit-video-overlay" />
       </div>
 
-      {/* Content layer */}
       <div className="submit-page theme-alpine-plus">
-        {/* Title bar: Back left, title centered */}
         <div className="title-bar">
           <button className="back-btn" onClick={onBack}>← Back</button>
           <h2 className="hero-title">{header}</h2>
@@ -376,7 +237,6 @@ function SubmitPage({ data, onBack }) {
 
         <div className="hero-sub">{subheader}</div>
         <div className="hero-sub">Note: queries can take up to a minute if the server has not been started in a while.</div>
-        {/* Controls centered */}
         <div className="hero-controls">
           <div className="controls-row">
             <span className="sort-label" style={{ opacity: 0.9 }}>
@@ -394,11 +254,9 @@ function SubmitPage({ data, onBack }) {
             </span>
           </div>
 
-          {/* Include small mountains under Sort By */}
           <FilterToggles
             toggles={[
               { key: "includeSmall", label: "Include small mountains", checked: includeSmall },
-              // Add more toggles here later if needed
             ]}
             onToggle={(key, checked) => {
               if (key === "includeSmall") setIncludeSmall(checked);
@@ -419,9 +277,9 @@ function SubmitPage({ data, onBack }) {
                     <PossibleTrip
                       name={r.name}
                       drivingTime={r.drivingTime}
-                      ticket_cost={r.ticket_cost} // base 1-day
+                      ticket_cost={r.ticket_cost} 
                       score={r.popularity}
-                      housing_cost={price ?? "…"} // total housing for stay
+                      housing_cost={price ?? "…"} 
                       nights={nights}
                       guests={data.Guests}
                     />

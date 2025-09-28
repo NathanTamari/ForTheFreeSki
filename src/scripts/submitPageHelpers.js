@@ -67,3 +67,21 @@ export function AnimatedOnMount({ children }) {
 
   return <div ref={ref}>{children}</div>;
 }
+
+
+export function FilterToggles({ toggles, onToggle }) {
+  return (
+    <div className="filter-toggles">
+      {toggles.map((t) => (
+      <label key={t.key} className="filter-toggle-pill">
+        <input
+        type="checkbox"
+        checked={!!t.checked}
+        onChange={(e) => onToggle(t.key, e.target.checked)}
+        />
+        {t.label}
+      </label>
+      ))}
+    </div>
+  );
+  }
