@@ -10,7 +10,7 @@ import SkeletonCard from "../components/SkeletonCard";
 import "aos/dist/aos.css";
 import submitVideo from "../media/submit-page-backdrop.mp4";
 import estimateRoundTripGasCostLocal from "../scripts/estimateRoundTripGasCost";
-import getMultiDayTicketCostLocal from "../scripts/getMultiDayTicketCost";
+import getMultiDayTicketCost from "../scripts/getMultiDayTicketCost";
 import { AnimatedOnMount, applySortInline, sameOrder, mapWithConcurrency, getResortKey, FilterToggles } from "../scripts/submitPageHelpers";
 
 const PREDICT_CONCURRENCY = Number(
@@ -55,21 +55,25 @@ function SubmitPage({ data, onBack }) {
   }, [data.checkIn, data.checkOut]);
 
   const getTotalCostForResort = (r) => {
-    const key = getResortKey(r);
-    const housing = prices[key];
-    const housingKnown = typeof housing === "number" && isFinite(housing);
-    const ticket = getMultiDayTicketCostLocal(r.ticket_cost, nights);
-    const ticketKnown = typeof ticket === "number" && isFinite(ticket);
-    if (!housingKnown || !ticketKnown) return Number.POSITIVE_INFINITY;
+  const key = getResortKey(r);
 
-    const gas = estimateRoundTripGasCostLocal({
+  const housing = Number(prices[key]);
+  if (!Number.isFinite(housing)) return Infinity;
+
+  const ticket = Number(getMultiDayTicketCost(data.Guests, r.ticket_cost, nights));
+  if (!Number.isFinite(ticket)) return Infinity;
+
+  const gas = Number(
+    estimateRoundTripGasCostLocal({
       drivingTime: r.drivingTime,
-      distanceMiles:
-        typeof r.distance_miles === "number" ? r.distance_miles : undefined,
-    });
-    const total = housing + ticket + gas;
-    return Number.isFinite(total) ? total : Number.POSITIVE_INFINITY;
-  };
+      distanceMiles: typeof r.distance_miles === "number" ? r.distance_miles : undefined,
+    })
+  );
+
+  const total = housing + ticket + gas;
+  return Number.isFinite(total) ? total : Infinity;
+};
+
 
   const visibleResorts = useMemo(() => {
     if (includeSmall) return resorts;
