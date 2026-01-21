@@ -60,7 +60,18 @@ function SubmitPage({ data, onBack }) {
   const housing = Number(prices[key]);
   if (!Number.isFinite(housing)) return Infinity;
 
-  const ticket = Number(getMultiDayTicketCost(data.Guests, r.ticket_cost, nights));
+  const ticket = Number(
+  getMultiDayTicketCost(
+    r.ticket_cost,          // basePrice
+    nights,                 // days
+    data.Guests,            // guests
+    !!data["Epic Pass"],    // hasEpicPass
+    !!data["Ikon Pass"],    // hasIkonPass
+    r.name                  // resortName (for JSON lookup)
+  )
+);
+
+
   if (!Number.isFinite(ticket)) return Infinity;
 
   const gas = Number(
@@ -286,6 +297,9 @@ function SubmitPage({ data, onBack }) {
                       housing_cost={price ?? "…"} 
                       nights={nights}
                       guests={data.Guests}
+                      hasEpicPass={!!data["Epic Pass"]}
+                      hasIkonPass={!!data["Ikon Pass"]}
+
                     />
                   </AnimatedOnMount>
                 );

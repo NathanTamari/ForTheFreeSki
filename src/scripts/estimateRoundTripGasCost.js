@@ -47,7 +47,6 @@ function estimateRoundTripGasCost({
   const roundTripMiles = oneWayMiles * 2;
   const gallons = roundTripMiles / mpg;
   const cost = gallons * gasPrice;
-  console.log(cost);
   return isNaN(cost) ? 0 : cost;
 }
 

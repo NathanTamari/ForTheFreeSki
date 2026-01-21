@@ -26,11 +26,12 @@ function PossibleTrip({
   mpg = 28,
   avgSpeed = 55,
   guests = 1,
+  hasEpicPass,
+  hasIkonPass,
 }) {
   const housingKnown = typeof housing_cost === 'number' && isFinite(housing_cost);
-  const ticketTotal = getMultiDayTicketCost(guests, ticket_cost, nights || 1);
+  const ticketTotal = getMultiDayTicketCost(guests, ticket_cost, nights || 1, hasEpicPass, hasIkonPass, name);
   const ticketKnown = typeof ticketTotal === 'number' && isFinite(ticketTotal);
-
   const gas = estimateRoundTripGasCost({
     drivingTime,
     avgSpeed,
