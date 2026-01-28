@@ -1,7 +1,10 @@
 .outer{
-    height: 100vh;
+    min-height: 100svh;
+    height: auto;
     box-sizing: border-box;
     position: relative;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 #tsparticles {
@@ -39,7 +42,8 @@
     justify-content: center;
     align-items: center;
     z-index: 2;
-    height: 100vh;
+    min-height: 100svh;
+    height: auto;
     pointer-events: auto;
 }
 
@@ -84,3 +88,34 @@
 
 
 
+@media (max-width: 600px) {
+    .input-form {
+        align-items: flex-start;
+        padding: 16px 0 24px;
+    }
+
+    .input-form form {
+        width: 92%;
+        gap: 24px;
+        padding: 16px;
+    }
+
+    .row-container {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 14px;
+    }
+
+    .row-container > * {
+        flex: 1 1 160px;
+        min-width: 160px;
+    }
+
+    .date-row-wrapper {
+        margin-bottom: 2.25rem;
+    }
+
+    .date-row-wrapper .error-text {
+        bottom: -1.75rem;
+    }
+}
