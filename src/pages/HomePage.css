@@ -119,3 +119,7 @@
         bottom: -1.75rem;
     }
 }
+
+.row-container:has(> :only-child) {
+    justify-content: center;
+}

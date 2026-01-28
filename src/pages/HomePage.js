@@ -198,13 +198,13 @@ function HomePage() {
                 onChange={handleFormChange}
                 defaultValue={DEFAULTS.region}
               />
-              <CheckBox name={"Willing to fly?"} onChange={handleFormChange} />
+              {/* <CheckBox name={"Willing to fly?"} onChange={handleFormChange} />
               <Dropdown
                 options={["AirBnB", "Hotel", "Both"]}
                 label={"Stay"}
                 onChange={handleFormChange}
                 defaultValue={"Both"}
-              />
+              /> */}
             </div>
 
             <div className="row-container">
